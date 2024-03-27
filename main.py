@@ -47,8 +47,7 @@ class App:
         previous = pygame.time.get_ticks()
         lag = 0.0
 
-        # advanced game loop to call on_loop() at fixed rate and on_render() as fast as possible
-        # (kinda overkill right now) (also not relevant)
+        # game loop
         while self._running:
             current = pygame.time.get_ticks()
             elapsed = current - previous
