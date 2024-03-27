@@ -1,4 +1,13 @@
 import pygame
+from game_handler import GameHandler
+
+screen_size = (500, 500)
+x_padding = 10
+y_padding = 10
+game_grid_size = (3, 3)
+
+game_count = game_grid_size[0]*game_grid_size[1]
+
 
 class App:
     # main function from where everything is called
@@ -11,13 +20,23 @@ class App:
         self._running = True
         self.display = None
 
-        self.size = (500, 500)
+        self.size = screen_size
+
+        self.game_handlers = []
 
     # called once to start program
     def on_init(self):
         pygame.init()
         self.display = pygame.display.set_mode(self.size, pygame.HWSURFACE | pygame.DOUBLEBUF)
         self._running = True
+
+        # calculating the dimensions of every game block
+        game_dim = ((screen_size[0]-((game_grid_size[0]+1)*x_padding))/game_grid_size[0],
+                    (screen_size[1]-((game_grid_size[1]+1)*y_padding))/game_grid_size[1])
+        for i in range(game_grid_size[1]):
+            for j in range(game_grid_size[0]):
+                game_pos = ((x_padding+j*(game_dim[0]+x_padding)), (y_padding+i*(game_dim[1]+y_padding)))
+                self.game_handlers.append(GameHandler(game_dim, game_pos, 10, j+i*game_grid_size[0]))
 
         self.on_execute()
 
@@ -37,6 +56,9 @@ class App:
     def on_render(self):
         self.display.fill((255, 255, 255))
 
+        for game in self.game_handlers:
+            game.draw(self.display)
+
         pygame.display.update()
 
     @staticmethod
@@ -44,6 +66,8 @@ class App:
         pygame.quit()
 
     def on_execute(self):
+
+
         previous = pygame.time.get_ticks()
         lag = 0.0
 
