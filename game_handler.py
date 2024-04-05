@@ -33,3 +33,7 @@ class GameHandler:
 
     def handle_death_conditions(self):
         pass
+
+    @classmethod
+    def get_state_size(cls):
+        return 8
