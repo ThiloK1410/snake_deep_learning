@@ -55,8 +55,6 @@ class GameHandler:
                           (self.pos[0] + i * self.grid_spacing[0], self.pos[1]),
                           (self.pos[0] + i * self.grid_spacing[0], self.pos[1] + self.dim[1]))
 
-
-
     def step(self):
         if self.is_running:
             head_pos = self.cells[0]
@@ -120,3 +118,7 @@ class GameHandler:
 
 
 
+
+    @classmethod
+    def get_state_size(cls):
+        return 8
