@@ -38,7 +38,7 @@ class ReplayMemory():
         return len(self.memory)
 
 
-class SnakeDQL():
+class SnakeDQL:
     def __init__(self, game_handlers, memory_size, h1_node_count=16, action_feature_count=4, learning_rate=0.01):
         self.game_handlers = game_handlers
 
@@ -57,7 +57,7 @@ class SnakeDQL():
 
 
 
-    def train(self, episodes):
+    def train(self, episodes: int):
         policy_dqn = DQN(self.state_feature_count, self.h1_node_count, self.action_feature_count)
         target_dqn = DQN(self.state_feature_count, self.h1_node_count, self.action_feature_count)
 
@@ -66,3 +66,9 @@ class SnakeDQL():
 
         self.optimizer = torch.optim.Adam(policy_dqn.parameters(), lr=self.learning_rate)
 
+        step_count = 0
+
+        for i in range(episodes):
+
+            for game in self.game_handlers:
+                game.game_init()

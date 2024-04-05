@@ -6,6 +6,10 @@ background_color = (0, 0, 0)
 cell_color = (0, 128, 0)
 food_color = (255, 204, 0)
 
+# dqn parameters
+step_count = 100
+food_step_bonus = 50
+
 directions = {
     0: (1, 0),
     1: (0, 1),
@@ -55,15 +59,16 @@ class GameHandler:
                           (self.pos[0] + i * self.grid_spacing[0], self.pos[1]),
                           (self.pos[0] + i * self.grid_spacing[0], self.pos[1] + self.dim[1]))
 
-    def step(self):
+    def step(self, action):
         if self.is_running:
+            new_state, reward, terminated = (None, 0, False)
             head_pos = self.cells[0]
             if not self.is_growing:
                 self.cells.pop()
             else:
                 self.is_growing = False
 
-            self.cells = [(head_pos[0]+directions[self.direction][0], head_pos[1]+directions[self.direction][1])] + self.cells
+            self.cells = [(head_pos[0]+directions[action][0], head_pos[1]+directions[action][1])] + self.cells
 
             self.handle_food_collisions()
             self.handle_death_conditions()
@@ -72,6 +77,7 @@ class GameHandler:
         # spawning snake
         mid = self.grid_size//2
         self.cells = [(mid, mid), (mid-1, mid), (mid-2, mid)]
+        self.is_running = True
 
         # spawning food
         self.spawn_food()
@@ -80,16 +86,21 @@ class GameHandler:
         head_pos = self.cells[0]
         if head_pos[0] < 0 or head_pos[0] >= self.grid_size or head_pos[1] < 0 or head_pos[1] >= self.grid_size:
             self.is_running = False
+            return True
 
         for cell in self.cells[1:]:
             if head_pos[0] == cell[0] and head_pos[1] == cell[1]:
                 self.is_running = False
+                return True
+
+        return True
 
     def handle_food_collisions(self):
-        for cell in self.cells:
-            if self.food_pos[0] == cell[0] and self.food_pos[1] == cell[1]:
-                self.grow_snake()
-                self.spawn_food()
+        if self.food_pos[0] == self.cells[0][0] and self.food_pos[1] == self.cells[0][1]:
+            self.grow_snake()
+            self.spawn_food()
+            return True
+        return False
 
     def change_direction(self, dir_idx: int):
         if self.is_running and (dir_idx % 2 != self.direction % 2):
@@ -111,9 +122,8 @@ class GameHandler:
         self.is_growing = True
 
     def get_data(self):
-        cell_map = np.zeros((self.grid_size, self.grid_size), dtype=np.float32)
-        for cell in self.cells:
-            cell_map[cell[1], cell[0]] = 1
+        pass
+
 
 
 
