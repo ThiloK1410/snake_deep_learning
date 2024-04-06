@@ -45,6 +45,7 @@ class SnakeDQL:
         self.state_feature_count = GameHandler.get_state_size()
         self.h1_node_count = h1_node_count
         self.action_feature_count = action_feature_count
+        self.action_space = GameHandler.get_action_space()
 
         self.learning_rate = learning_rate
 
@@ -68,7 +69,20 @@ class SnakeDQL:
 
         step_count = 0
 
+        steps_left = torch.full()
+
         for i in range(episodes):
 
-            for game in self.game_handlers:
+            actions = torch.zeros(len(self.game_handlers))
+
+            for idx, game in enumerate(self.game_handlers):
                 game.game_init()
+
+            while
+
+                if random.random() < self.epsilon:
+                    actions[idx] = random.choice(self.action_space)
+                else:
+                    with torch.no_grad():
+                        actions[idx]
+

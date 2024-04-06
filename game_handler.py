@@ -9,6 +9,7 @@ food_color = (255, 204, 0)
 # dqn parameters
 step_count = 100
 food_step_bonus = 50
+allow_self_kill_through_movement = True
 
 directions = {
     0: (1, 0),
@@ -28,7 +29,7 @@ class GameHandler:
 
         self.is_running = True
         self.cells = []
-        self.food_pos = tuple
+        self.food_pos: (int, int) = None
         self.is_growing = False
         self.direction = 0
         self.game_init()
@@ -70,8 +71,15 @@ class GameHandler:
 
             self.cells = [(head_pos[0]+directions[action][0], head_pos[1]+directions[action][1])] + self.cells
 
-            self.handle_food_collisions()
-            self.handle_death_conditions()
+            if self.handle_food_collisions():
+                reward = 1
+            if self.handle_death_conditions():
+                reward = -1
+                terminated = True
+
+            new_state = self.get_state()
+
+            return new_state, reward, terminated
 
     def game_init(self):
         # spawning snake
@@ -93,7 +101,7 @@ class GameHandler:
                 self.is_running = False
                 return True
 
-        return True
+        return False
 
     def handle_food_collisions(self):
         if self.food_pos[0] == self.cells[0][0] and self.food_pos[1] == self.cells[0][1]:
@@ -121,14 +129,56 @@ class GameHandler:
     def grow_snake(self):
         self.is_growing = True
 
-    def get_data(self):
-        pass
+    def get_state(self):
+        food_offset_x = (self.food_pos[0] - self.cells[0][0]) / self.grid_size
+        food_offset_y = (self.food_pos[1] - self.cells[0][1]) / self.grid_size
+        is_right = float(self.direction==0)
+        is_down = float(self.direction==1)
+        is_left = float(self.direction==2)
+        is_up = float(self.direction==3)
+        danger_right = 0.
+        danger_down = 0.
+        danger_left = 0.
+        danger_up = 0.
+        head_pos_x = self.cells[0][0] / self.grid_size
+        head_pos_y = self.cells[0][1] / self.grid_size
+
+        head_pos = self.cells[0]
+
+        for i in range(self.grid_size):
+            pos = (head_pos[0] + (i+1), head_pos[1])
+            if self.overlaps_with_snake(pos):
+                danger_right = 1 - (pos[0]-head_pos[0]) / self.grid_size
+                break
+
+        for i in range(self.grid_size):
+            pos = (head_pos[0], head_pos[1] + (i+1))
+            if self.overlaps_with_snake(pos):
+                danger_down = 1 - (pos[1]-head_pos[1]) / self.grid_size
+                break
+
+        for i in range(self.grid_size):
+            pos = (head_pos[0] - (i+1), head_pos[1])
+            if self.overlaps_with_snake(pos):
+                danger_left = 1 - (pos[0]-head_pos[0]) / self.grid_size
+                break
+
+        for i in range(self.grid_size):
+            pos = (head_pos[0], head_pos[1] - (i+1))
+            if self.overlaps_with_snake(pos):
+                danger_up = 1 - (pos[1]-head_pos[1]) / self.grid_size
+                break
 
 
-
-
-
+        return np.array([food_offset_x, food_offset_y,
+                         is_right, is_down, is_left, is_up,
+                         danger_right, danger_down, danger_left, danger_up,
+                         head_pos_x, head_pos_y])
 
     @classmethod
     def get_state_size(cls):
-        return 8
+        return 12
+
+    @classmethod
+    def get_action_space(cls):
+        return [0, 1, 2, 3]
