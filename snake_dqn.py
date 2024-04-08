@@ -1,12 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import TensorDataset, DataLoader
 
 from game_handler import GameHandler
 
 from collections import deque
 
 import random
+
+memory = (torch.tensor(()), int, torch.tensor(()), int, bool)
 
 class DQN(nn.Module):
     def __init__(self, state_feature_count, h1_node_count, action_feature_count):
@@ -26,21 +29,35 @@ class DQN(nn.Module):
 
 class ReplayMemory():
     def __init__(self, maxlen):
-        self.memory = deque([], maxlen=maxlen)
+        self.memory = [None] * maxlen
+        self.max_len = maxlen
+        self.index = 0
+        self.full = False
 
-    def append(self, x):
-        self.memory.append(x)
+    def append(self, x: memory):
+        self.memory[self.index] = x
+        self.index += 1
+        if self.index >= self.max_len:
+            self.index = 0
+            self.full = True
 
-    def sample(self, sample_size):
-        return random.sample(self.memory, sample_size)
+    def get_iterator(self, batch_size):
+        if not self.full and self.index<batch_size:
+            return []
+        if self.full:
+            dataset = TensorDataset(torch.Tensor(self.memory))
+        else:
+            dataset = TensorDataset(torch.Tensor(self.memory[:self.index]))
+        return DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
+
 
     def __len__(self):
         return len(self.memory)
 
 
 class SnakeDQL:
-    def __init__(self, game_handlers, memory_size, h1_node_count=16, action_feature_count=4, learning_rate=0.01):
-        self.game_handlers = game_handlers
+    def __init__(self, memory_size=1024, h1_node_count=16, action_feature_count=4,
+                 learning_rate=0.01, batch_size=32, discount_factor=0.9, network_sync_rate=10, epsilon_decay=0.001):
 
         self.state_feature_count = GameHandler.get_state_size()
         self.h1_node_count = h1_node_count
@@ -48,41 +65,77 @@ class SnakeDQL:
         self.action_space = GameHandler.get_action_space()
 
         self.learning_rate = learning_rate
+        self.batch_size = batch_size
 
-        self.optimizer = None
+        self.policy_dqn = DQN(self.state_feature_count, self.h1_node_count, self.action_feature_count)
+        self.target_dqn = DQN(self.state_feature_count, self.h1_node_count, self.action_feature_count)
+
+        # synchronize the two networks, will be repeated every (network_sync_rate) batches trained
+        self.target_dqn.load_state_dict(self.policy_dqn.state_dict())
+        self.network_sync_rate = network_sync_rate
+
+        self.optimizer = torch.optim.Adam(self.policy_dqn.parameters(), lr=self.learning_rate)
+
+        self.loss_fn = nn.MSELoss
 
         # exploration vs exploitation parameter
         self.epsilon = 1
+        self.epsilon_decay = epsilon_decay
+
+        # parameter which describes value of future rewards
+        self.discount_factor = discount_factor
+
+        # keeping track of how many batches the model were trained on
+        self.trained_batches = 0
 
         self.memory = ReplayMemory(memory_size)
 
 
+    def __call__(self, x):
+        if random.random() <= self.epsilon:
+            return random.randint(0, self.action_feature_count-1)
+        else:
+            return self.policy_dqn.forward(x).argmax()
 
-    def train(self, episodes: int):
-        policy_dqn = DQN(self.state_feature_count, self.h1_node_count, self.action_feature_count)
-        target_dqn = DQN(self.state_feature_count, self.h1_node_count, self.action_feature_count)
+    def memorize(self, mem: memory):
+        state, action, new_state, reward, terminated = mem
 
-        # synchronize the two networks
-        target_dqn.load_state_dict(policy_dqn.state_dict())
+        self.memory.append((state, action, new_state, reward, terminated))
 
-        self.optimizer = torch.optim.Adam(policy_dqn.parameters(), lr=self.learning_rate)
+    def train(self):
 
-        step_count = 0
+        for mini_batch in self.memory.get_iterator(self.batch_size):
+            self.optimize(mini_batch)
+            self.epsilon = max(0.01, self.epsilon - self.epsilon_decay)
+            self.trained_batches += 1
+            # sync the two dqn's according to network_sync_rate
+            if self.trained_batches % self.network_sync_rate == 0:
+                self.target_dqn.load_state_dict(self.policy_dqn.state_dict())
 
-        steps_left = torch.full()
+    def optimize(self, mini_batch):
 
-        for i in range(episodes):
+        current_q_list = []
+        target_q_list = []
 
-            actions = torch.zeros(len(self.game_handlers))
+        for state, action, new_state, reward, terminated in mini_batch:
 
-            for idx, game in enumerate(self.game_handlers):
-                game.game_init()
+            if terminated:
+                target = torch.FloatTensor([reward])
+            else:
+                with torch.no_grad():
+                    target = reward + self.discount_factor * self.target_dqn(new_state).max()
 
-            while
+            # predicted q-values from model of current state
+            current_q = self.policy_dqn(state)
+            current_q_list.append(current_q)
 
-                if random.random() < self.epsilon:
-                    actions[idx] = random.choice(self.action_space)
-                else:
-                    with torch.no_grad():
-                        actions[idx]
+            # updated q-values for current state
+            target_q = self.target_dqn(state)
+            target_q[action] = target
+            target_q_list.append(target_q)
 
+        loss = self.loss_fn(torch.stack(current_q_list), torch.stack(target_q_list))
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()

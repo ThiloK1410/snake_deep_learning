@@ -60,9 +60,13 @@ class GameHandler:
                           (self.pos[0] + i * self.grid_spacing[0], self.pos[1]),
                           (self.pos[0] + i * self.grid_spacing[0], self.pos[1] + self.dim[1]))
 
+    # each step taken returns a memory about it
     def step(self, action):
         if self.is_running:
-            new_state, reward, terminated = (None, 0, False)
+            state, action, new_state, reward, terminated = (self.get_state(), action, None, 0, False)
+
+            self.direction = action
+
             head_pos = self.cells[0]
             if not self.is_growing:
                 self.cells.pop()
@@ -79,13 +83,16 @@ class GameHandler:
 
             new_state = self.get_state()
 
-            return new_state, reward, terminated
+            memory = (state, action, new_state, reward, terminated)
+
+            return memory
 
     def game_init(self):
         # spawning snake
         mid = self.grid_size//2
         self.cells = [(mid, mid), (mid-1, mid), (mid-2, mid)]
         self.is_running = True
+        self.is_growing = False
 
         # spawning food
         self.spawn_food()

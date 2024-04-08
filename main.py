@@ -1,10 +1,11 @@
 import pygame
 from game_handler import GameHandler
+from snake_dqn import SnakeDQL
 
 screen_size = (800, 800)
 x_padding = 10
 y_padding = 10
-game_grid_size = (1, 1)
+game_grid_size = (3, 3)
 game_size = 10
 
 game_count = game_grid_size[0]*game_grid_size[1]
@@ -22,6 +23,11 @@ class App:
         self.display = None
 
         self.size = screen_size
+
+        self.reinforcement_learner = SnakeDQL()
+
+        self.episode_in_progress = False
+        self.current_episode = 0
 
         self.game_handlers = []
 
@@ -52,19 +58,24 @@ class App:
                 self.fps += 1
             if event.key == pygame.K_MINUS:
                 self.fps -= 1
-            if event.key == pygame.K_RIGHT:
-                self.game_handlers[0].change_direction(0)
-            if event.key == pygame.K_DOWN:
-                self.game_handlers[0].change_direction(1)
-            if event.key == pygame.K_LEFT:
-                self.game_handlers[0].change_direction(2)
-            if event.key == pygame.K_UP:
-                self.game_handlers[0].change_direction(3)
 
     # loop which will be executed at fixed rate (for physics, animations and such)
     def on_loop(self):
+        self.episode_in_progress = False
         for game in self.game_handlers:
-            game.step()
+            if game.is_running:
+                self.episode_in_progress = True
+                memory = game.step(self.reinforcement_learner(game.get_state()))
+                self.reinforcement_learner.memorize(memory)
+
+        # if all games are finished, train ai, reset them and start new episode
+        if not self.episode_in_progress:
+            self.reinforcement_learner.train()
+            for game in self.game_handlers:
+                game.game_init()
+            self.episode_in_progress = True
+            self.current_episode += 1
+            print(f"CURRENT EPISODE: {self.current_episode}")
 
     # loop which will only be called when enough cpu time is available
     def on_render(self):
