@@ -15,7 +15,7 @@ class DQN(nn.Module):
     def __init__(self, state_feature_count, h1_node_count, action_feature_count):
         super().__init__()
 
-        device = torch.device("gpu" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.fc1 = nn.Linear(state_feature_count, h1_node_count, device=device)
         self.fc2 = nn.Linear(h1_node_count, action_feature_count)
@@ -42,14 +42,13 @@ class ReplayMemory():
             self.full = True
 
     def get_iterator(self, batch_size):
-        if not self.full and self.index<batch_size:
+        if not self.full and self.index < batch_size:
             return []
         if self.full:
             dataset = TensorDataset(torch.Tensor(self.memory))
         else:
-            dataset = TensorDataset(torch.Tensor(self.memory[:self.index]))
-        return DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
-
+            dataset = TensorDataset(torch.Tensor(self.memory[:self.index-1]))
+        return DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
     def __len__(self):
         return len(self.memory)
